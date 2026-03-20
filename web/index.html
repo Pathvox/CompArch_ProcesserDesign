@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Minterm Matrix</title>
+  <style>
+    :root {
+      --bg-a: #081026;
+      --bg-b: #120f2f;
+      --panel: rgba(17, 30, 58, 0.88);
+      --panel-2: rgba(28, 46, 84, 0.9);
+      --line: rgba(255, 255, 255, 0.14);
+      --text: #ecf3ff;
+      --muted: #9eb0d4;
+      --good: #4ce5a3;
+      --warn: #ffcb65;
+      --bad: #ff7a92;
+      --c1: #56d8ff;
+      --c2: #8f7dff;
+      --c3: #ff8f4f;
+      --shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Verdana, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1100px 800px at 5% -10%, rgba(86, 216, 255, 0.2), transparent 55%),
+        radial-gradient(1000px 700px at 110% 0%, rgba(143, 125, 255, 0.22), transparent 58%),
+        radial-gradient(900px 700px at 50% 120%, rgba(255, 143, 79, 0.15), transparent 55%),
+        linear-gradient(135deg, var(--bg-a), var(--bg-b));
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    .grid-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.08;
+      background-image:
+        linear-gradient(to right, #fff 1px, transparent 1px),
+        linear-gradient(to bottom, #fff 1px, transparent 1px);
+      background-size: 38px 38px;
+    }
+
+    .wrap {
+      width: min(1140px, 94vw);
+      margin: 22px auto 36px;
+      display: grid;
+      gap: 14px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero {
+      background: linear-gradient(150deg, rgba(24, 41, 82, 0.9), rgba(17, 29, 55, 0.92));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 300px;
+      height: 300px;
+      right: -120px;
+      top: -120px;
+      background: radial-gradient(circle, rgba(86, 216, 255, 0.35), transparent 68%);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 2.8vw, 34px);
+      letter-spacing: 0.5px;
+    }
+
+    .subtitle {
+      margin: 8px 0 0;
+      color: var(--muted);
+      max-width: 760px;
+    }
+
+    .tabs {
+      display: inline-grid;
+      grid-auto-flow: column;
+      gap: 8px;
+      background: rgba(11, 20, 38, 0.65);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 6px;
+      width: fit-content;
+    }
+
+    .tab-btn {
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-weight: 700;
+      color: #081024;
+      cursor: pointer;
+      background: linear-gradient(120deg, #87f6d0, #39d7ff);
+      transition: transform 0.18s ease, filter 0.2s ease;
+    }
+
+    .tab-btn.secondary {
+      background: linear-gradient(120deg, #ffd27c, #ff9f67);
+    }
+
+    .tab-btn.active {
+      outline: 2px solid rgba(255, 255, 255, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .tab-btn:hover { filter: brightness(1.06); }
+
+    .panel {
+      background: linear-gradient(165deg, var(--panel), var(--panel-2));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+
+    .hidden { display: none; }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .label { color: var(--muted); font-weight: 600; }
+
+    input[type="number"] {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: rgba(10, 19, 39, 0.9);
+      color: var(--text);
+      width: 84px;
+      font-weight: 700;
+    }
+
+    .btn {
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-weight: 800;
+      cursor: pointer;
+      color: #071022;
+      background: linear-gradient(120deg, #87f6d0, #39d7ff);
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+      box-shadow: 0 8px 18px rgba(57, 215, 255, 0.22);
+    }
+
+    .btn.alt {
+      background: linear-gradient(120deg, #ffd27c, #ff9f67);
+      box-shadow: 0 8px 18px rgba(255, 159, 103, 0.25);
+    }
+
+    .btn:hover { transform: translateY(-1px); }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(10, 19, 39, 0.55);
+      color: #d7e9ff;
+      font-size: 14px;
+    }
+
+    .board {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(7, 14, 29, 0.5);
+      padding: 12px;
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 420px;
+    }
+
+    th, td {
+      border: 1px solid var(--line);
+      padding: 8px;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    th {
+      background: rgba(86, 216, 255, 0.12);
+      font-weight: 800;
+      color: #d8f3ff;
+    }
+
+    td.on {
+      background: rgba(76, 229, 163, 0.18);
+      color: #bbffe2;
+      font-weight: 800;
+    }
+
+    td.off {
+      background: rgba(255, 122, 146, 0.14);
+      color: #ffd0da;
+      font-weight: 800;
+    }
+
+    .out-toggle {
+      display: inline-grid;
+      grid-auto-flow: column;
+      gap: 6px;
+    }
+
+    .mini-btn {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      width: 34px;
+      height: 28px;
+      cursor: pointer;
+      font-weight: 800;
+      color: #deebff;
+      background: rgba(9, 18, 36, 0.8);
+    }
+
+    .mini-btn.active0 { background: rgba(255, 122, 146, 0.25); color: #ffd7df; }
+    .mini-btn.active1 { background: rgba(76, 229, 163, 0.26); color: #c6ffe8; }
+
+    .section-title {
+      margin: 4px 0 10px;
+      font-size: 18px;
+    }
+
+    .results {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+      animation: rise 260ms ease;
+    }
+
+    .card-lite {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(8, 17, 33, 0.55);
+    }
+
+    .kmap-note {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+
+    .hud {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .hud .chip {
+      justify-content: center;
+      font-weight: 700;
+    }
+
+    .progress {
+      height: 10px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(8, 16, 32, 0.7);
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .progress > span {
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #56d8ff, #8f7dff, #ff8f4f);
+      transition: width 0.2s ease;
+    }
+
+    .question {
+      margin: 0 0 10px;
+      font-size: clamp(18px, 2.5vw, 24px);
+    }
+
+    .guess-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      max-width: 360px;
+    }
+
+    .guess-btn {
+      border: 0;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 18px;
+      font-weight: 900;
+      cursor: pointer;
+      color: #081024;
+      background: linear-gradient(120deg, #87f6d0, #39d7ff);
+    }
+
+    .guess-btn.alt {
+      background: linear-gradient(120deg, #ffd27c, #ff9f67);
+    }
+
+    .feedback {
+      min-height: 24px;
+      margin-top: 10px;
+      font-weight: 700;
+    }
+
+    .good { color: #abffd8; }
+    .bad { color: #ffc0cb; }
+
+    .pulse {
+      animation: pulse 220ms ease;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.02); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 780px) {
+      .hud { grid-template-columns: 1fr; }
+      .guess-row { max-width: none; }
+      th, td { font-size: 13px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="grid-overlay"></div>
+  <div class="wrap">
+    <section class="hero">
+      <h1>The Minterm Matrix</h1>
+      <p class="subtitle">Set truth table outputs, get SOP instantly, and visualize Karnaugh maps. Switch to game mode to guess outputs and chase streaks.</p>
+    </section>
+
+    <section class="tabs">
+      <button id="tabBuild" class="tab-btn active">Build Mode</button>
+      <button id="tabGame" class="tab-btn secondary">Game Mode</button>
+    </section>
+
+    <section id="buildSection" class="panel">
+      <div class="row">
+        <span class="label">Variables (2-4)</span>
+        <input id="varCount" type="number" min="2" max="4" value="3" />
+        <button id="makeInputs" class="btn">Generate Input Grid</button>
+      </div>
+      <div id="truthInput"></div>
+      <div class="row hidden" id="buildActions">
+        <button id="solveBtn" class="btn alt">Calculate SOP + K-Map</button>
+      </div>
+      <div id="buildOutput"></div>
+    </section>
+
+    <section id="gameSection" class="panel hidden">
+      <div class="row">
+        <span class="label">Variables (2-4)</span>
+        <input id="gameVarCount" type="number" min="2" max="4" value="3" />
+        <button id="startGame" class="btn">Start New Round</button>
+      </div>
+
+      <div id="gamePlay" class="card-lite hidden">
+        <div class="hud">
+          <span class="chip" id="scorePill">Score: 0</span>
+          <span class="chip" id="streakPill">Streak: 0</span>
+          <span class="chip" id="qPill">Q 0/0</span>
+        </div>
+        <div class="progress"><span id="progressBar"></span></div>
+        <h3 class="question" id="questionText">Inputs: (0, 0)</h3>
+        <div class="guess-row">
+          <button data-guess="0" class="guess-btn">Guess 0</button>
+          <button data-guess="1" class="guess-btn alt">Guess 1</button>
+        </div>
+        <p id="feedback" class="feedback"></p>
+      </div>
+
+      <div id="gameOutput"></div>
+    </section>
+  </div>
+
+  <script>
+    const tabBuild = document.getElementById("tabBuild");
+    const tabGame = document.getElementById("tabGame");
+    const buildSection = document.getElementById("buildSection");
+    const gameSection = document.getElementById("gameSection");
+
+    function setTab(which) {
+      const build = which === "build";
+      tabBuild.classList.toggle("active", build);
+      tabGame.classList.toggle("active", !build);
+      buildSection.classList.toggle("hidden", !build);
+      gameSection.classList.toggle("hidden", build);
+    }
+
+    tabBuild.addEventListener("click", () => setTab("build"));
+    tabGame.addEventListener("click", () => setTab("game"));
+
+    const varCountEl = document.getElementById("varCount");
+    const makeInputsBtn = document.getElementById("makeInputs");
+    const truthInput = document.getElementById("truthInput");
+    const solveBtn = document.getElementById("solveBtn");
+    const buildActions = document.getElementById("buildActions");
+    const buildOutput = document.getElementById("buildOutput");
+
+    const gameVarCount = document.getElementById("gameVarCount");
+    const startGameBtn = document.getElementById("startGame");
+    const gamePlay = document.getElementById("gamePlay");
+    const questionText = document.getElementById("questionText");
+    const scorePill = document.getElementById("scorePill");
+    const streakPill = document.getElementById("streakPill");
+    const qPill = document.getElementById("qPill");
+    const feedback = document.getElementById("feedback");
+    const gameOutput = document.getElementById("gameOutput");
+    const progressBar = document.getElementById("progressBar");
+
+    let buildRows = [];
+    let gameRows = [];
+    let gameIndex = 0;
+    let score = 0;
+    let streak = 0;
+
+    function clampVars(n) {
+      return Math.max(2, Math.min(4, Number(n) || 3));
+    }
+
+    function combos(n) {
+      const out = [];
+      for (let i = 0; i < (1 << n); i++) {
+        const bits = [];
+        for (let b = n - 1; b >= 0; b--) bits.push((i >> b) & 1);
+        out.push(bits);
+      }
+      return out;
+    }
+
+    function letters(n) {
+      return Array.from({ length: n }, (_, i) => String.fromCharCode(65 + i));
+    }
+
+    function canonicalSOP(rows, n) {
+      const vars = letters(n);
+      const minterms = [];
+      const terms = [];
+
+      rows.forEach((row, i) => {
+        if (row.output === 1) {
+          minterms.push(i);
+          terms.push(row.inputs.map((v, idx) => (v ? vars[idx] : `${vars[idx]}'`)).join(""));
+        }
+      });
+
+      return { minterms, sop: terms.length ? terms.join(" + ") : "0" };
+    }
+
+    function tableHTML(headers, rows, cellClassFn = null) {
+      const head = headers.map(h => `<th>${h}</th>`).join("");
+      const body = rows.map((r, ri) => {
+        const tds = r.map((c, ci) => {
+          const cls = cellClassFn ? cellClassFn(c, ri, ci) : "";
+          return `<td class="${cls}">${c}</td>`;
+        }).join("");
+        return `<tr>${tds}</tr>`;
+      }).join("");
+      return `<div class="board"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+    }
+
+    function renderTruthTable(rows, n) {
+      const hdr = ["m", ...letters(n), "F"];
+      const body = rows.map((r, i) => [i, ...r.inputs, r.output]);
+      return `
+        <div class="card-lite">
+          <h3 class="section-title">Truth Table</h3>
+          ${tableHTML(hdr, body, (c, _r, ci) => ci === hdr.length - 1 ? (c === 1 ? "on" : "off") : "")}
+        </div>
+      `;
+    }
+
+    function gray2() {
+      return [[0,0], [0,1], [1,1], [1,0]];
+    }
+
+    function renderKMap(rows, n) {
+      const map = new Map(rows.map(r => [r.inputs.join(""), r.output]));
+
+      if (n === 2) {
+        const hdr = ["A\\B", "0", "1"];
+        const body = [
+          ["0", map.get("00"), map.get("01")],
+          ["1", map.get("10"), map.get("11")]
+        ];
+        return `
+          <div class="card-lite">
+            <h3 class="section-title">Karnaugh Map (2 Variables)</h3>
+            ${tableHTML(hdr, body, (c, _r, ci) => ci > 0 ? (c === 1 ? "on" : "off") : "")}
+          </div>
+        `;
+      }
+
+      if (n === 3) {
+        const g = gray2();
+        const hdr = ["A\\BC", "00", "01", "11", "10"];
+        const body = [0,1].map(a => {
+          const row = [String(a)];
+          g.forEach(([b, c]) => row.push(map.get(`${a}${b}${c}`)));
+          return row;
+        });
+        return `
+          <div class="card-lite">
+            <h3 class="section-title">Karnaugh Map (3 Variables)</h3>
+            ${tableHTML(hdr, body, (c, _r, ci) => ci > 0 ? (c === 1 ? "on" : "off") : "")}
+          </div>
+        `;
+      }
+
+      const g = gray2();
+      const hdr = ["AB\\CD", "00", "01", "11", "10"];
+      const body = g.map(([a,b]) => {
+        const row = [`${a}${b}`];
+        g.forEach(([c,d]) => row.push(map.get(`${a}${b}${c}${d}`)));
+        return row;
+      });
+
+      return `
+        <div class="card-lite">
+          <h3 class="section-title">Karnaugh Map (4 Variables)</h3>
+          ${tableHTML(hdr, body, (c, _r, ci) => ci > 0 ? (c === 1 ? "on" : "off") : "")}
+        </div>
+      `;
+    }
+
+    function buildInputGrid(n) {
+      buildRows = combos(n).map(inputs => ({ inputs, output: 0 }));
+      const hdr = ["m", ...letters(n), "Output F"];
+
+      const body = buildRows.map((r, i) => {
+        const toggle = `
+          <div class="out-toggle" data-i="${i}">
+            <button class="mini-btn active0" data-v="0">0</button>
+            <button class="mini-btn" data-v="1">1</button>
+          </div>
+        `;
+        return [i, ...r.inputs, toggle];
+      });
+
+      truthInput.innerHTML = `
+        <div class="card-lite">
+          <h3 class="section-title">Set Output Values</h3>
+          ${tableHTML(hdr, body)}
+        </div>
+      `;
+
+      buildActions.classList.remove("hidden");
+      buildOutput.innerHTML = "";
+
+      truthInput.querySelectorAll(".out-toggle").forEach(group => {
+        group.addEventListener("click", (e) => {
+          const btn = e.target.closest("button");
+          if (!btn) return;
+          const idx = Number(group.dataset.i);
+          const val = Number(btn.dataset.v);
+          buildRows[idx].output = val;
+
+          const buttons = group.querySelectorAll(".mini-btn");
+          buttons.forEach(b => b.classList.remove("active0", "active1"));
+          if (val === 0) {
+            buttons[0].classList.add("active0");
+          } else {
+            buttons[1].classList.add("active1");
+          }
+        });
+      });
+    }
+
+    makeInputsBtn.addEventListener("click", () => {
+      const n = clampVars(varCountEl.value);
+      varCountEl.value = n;
+      buildInputGrid(n);
+    });
+
+    solveBtn.addEventListener("click", () => {
+      if (!buildRows.length) return;
+      const n = clampVars(varCountEl.value);
+      const res = canonicalSOP(buildRows, n);
+
+      buildOutput.innerHTML = `
+        <div class="results">
+          ${renderTruthTable(buildRows, n)}
+          ${renderKMap(buildRows, n)}
+          <div class="card-lite">
+            <h3 class="section-title">Boolean Results</h3>
+            <span class="chip">Minterms: Sigma[${res.minterms.join(", ")}]</span>
+            <span class="chip">Canonical SOP: ${res.sop}</span>
+            <p class="kmap-note">K-map axes use Gray-code ordering: 00, 01, 11, 10.</p>
+          </div>
+        </div>
+      `;
+      buildOutput.classList.remove("pulse");
+      void buildOutput.offsetWidth;
+      buildOutput.classList.add("pulse");
+    });
+
+    function randomRows(n) {
+      const cs = combos(n);
+      let outs;
+      do {
+        outs = cs.map(() => Math.random() < 0.5 ? 0 : 1);
+      } while (outs.every(v => v === 0) || outs.every(v => v === 1));
+      return cs.map((inputs, i) => ({ inputs, output: outs[i] }));
+    }
+
+    function refreshGameUI() {
+      const total = gameRows.length;
+      scorePill.textContent = `Score: ${score}`;
+      streakPill.textContent = `Streak: ${streak}`;
+      qPill.textContent = `Q ${Math.min(gameIndex + 1, total)}/${total}`;
+
+      const pct = total ? (gameIndex / total) * 100 : 0;
+      progressBar.style.width = `${pct}%`;
+
+      if (gameIndex < total) {
+        questionText.textContent = `Inputs: (${gameRows[gameIndex].inputs.join(", ")})`;
+      }
+    }
+
+    startGameBtn.addEventListener("click", () => {
+      const n = clampVars(gameVarCount.value);
+      gameVarCount.value = n;
+
+      gameRows = randomRows(n);
+      gameIndex = 0;
+      score = 0;
+      streak = 0;
+      feedback.textContent = "";
+      feedback.className = "feedback";
+      gameOutput.innerHTML = "";
+      gamePlay.classList.remove("hidden");
+      refreshGameUI();
+    });
+
+    document.querySelectorAll(".guess-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        if (!gameRows.length || gameIndex >= gameRows.length) return;
+
+        const guess = Number(btn.dataset.guess);
+        const actual = gameRows[gameIndex].output;
+
+        if (guess === actual) {
+          score += 10;
+          streak += 1;
+          feedback.textContent = "Correct! +10";
+          feedback.className = "feedback good";
+        } else {
+          score -= 5;
+          streak = 0;
+          feedback.textContent = `Wrong. Correct answer: ${actual}`;
+          feedback.className = "feedback bad";
+        }
+
+        gameIndex += 1;
+        refreshGameUI();
+
+        if (gameIndex >= gameRows.length) {
+          progressBar.style.width = "100%";
+          questionText.textContent = "Round Complete";
+          const n = clampVars(gameVarCount.value);
+          const res = canonicalSOP(gameRows, n);
+
+          gameOutput.innerHTML = `
+            <div class="results">
+              <div class="card-lite">
+                <h3 class="section-title">Final Score: ${score}</h3>
+                <span class="chip">Best streak this run: ${streak}</span>
+              </div>
+              ${renderTruthTable(gameRows, n)}
+              ${renderKMap(gameRows, n)}
+              <div class="card-lite">
+                <h3 class="section-title">Function Reveal</h3>
+                <span class="chip">Minterms: Sigma[${res.minterms.join(", ")}]</span>
+                <span class="chip">Canonical SOP: ${res.sop}</span>
+              </div>
+            </div>
+          `;
+        }
+      });
+    });
+  </script>
+</body>
+</html>
