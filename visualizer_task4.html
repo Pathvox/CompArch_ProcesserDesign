@@ -1,0 +1,855 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Single-Cycle Processor Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-0: #0b0603;
+    --bg-1: #171007;
+    --bg-2: #23190d;
+    --panel: rgba(10, 18, 30, 0.78);
+    --line: #58402b;
+    --text: #ffe7d0;
+    --muted: #c4a589;
+    --cyan: #ff9a4a;
+    --cyan-d: #de7c35;
+    --amber: #ffd978;
+    --pink: #76d8ff;
+    --green: #a2ff8a;
+    --red: #ff7a6b;
+    --mono: "JetBrains Mono", monospace;
+    --display: "Audiowide", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    color: var(--text);
+    font-family: var(--mono);
+    background:
+      radial-gradient(1200px 540px at 50% -120px, rgba(255, 154, 74, 0.24), transparent 62%),
+      radial-gradient(700px 480px at 88% 26%, rgba(118, 216, 255, 0.14), transparent 62%),
+      radial-gradient(640px 380px at 12% 60%, rgba(162, 255, 138, 0.12), transparent 62%),
+      linear-gradient(180deg, var(--bg-0), var(--bg-1) 35%, var(--bg-2));
+    min-height: 100vh;
+  }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0.0),
+      rgba(0,0,0,0.0) 2px,
+      rgba(0,0,0,0.15) 3px,
+      rgba(0,0,0,0.15) 4px
+    );
+    opacity: 0.7;
+  }
+
+  .page {
+    width: min(1120px, 95vw);
+    margin: 0 auto;
+    padding: 20px 0 34px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .top-banner {
+    text-align: center;
+    margin-bottom: 18px;
+  }
+  .meta {
+    color: var(--muted);
+    font-family: var(--display);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+  h1 {
+    margin: 6px 0 0;
+    font-family: var(--display);
+    font-size: clamp(38px, 7vw, 74px);
+    line-height: 0.95;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--cyan);
+    text-shadow:
+      0 0 10px rgba(255, 154, 74, 0.9),
+      0 0 34px rgba(255, 154, 74, 0.45);
+  }
+
+  .panel {
+    background: linear-gradient(180deg, rgba(14, 23, 37, 0.86), rgba(8, 14, 24, 0.9));
+    border: 1px solid rgba(255, 154, 74, 0.2);
+    border-radius: 14px;
+    box-shadow:
+      0 10px 28px rgba(0, 0, 0, 0.34),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  }
+
+  .section-label {
+    font-family: var(--display);
+    font-size: 13px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: #a8c6dd;
+    margin-bottom: 12px;
+  }
+
+  .control-panel { padding: 18px; margin-bottom: 14px; }
+  .bit-row {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(60px, 1fr));
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .bit-box {
+    border: 1px solid rgba(255, 217, 120, 0.5);
+    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.18));
+    padding: 8px;
+    text-align: center;
+    min-height: 74px;
+  }
+  .bit-name {
+    font-family: var(--display);
+    font-size: 12px;
+    color: #a9c2d8;
+    margin-bottom: 8px;
+    letter-spacing: 0.08em;
+  }
+  .bit-val {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+  }
+  .bit-val button {
+    width: 34px;
+    height: 34px;
+    border-radius: 6px;
+    border: 1px solid #5a4431;
+    background: #2a1e14;
+    color: #f6ddc6;
+    font-family: var(--display);
+    font-size: 17px;
+    cursor: pointer;
+    transition: 0.16s ease;
+  }
+  .bit-val button:hover { border-color: var(--cyan); color: var(--cyan); }
+  .bit-val button.active {
+    border-color: var(--amber);
+    color: #2b1703;
+    background: linear-gradient(180deg, #ffe9bd, #ffbd5a);
+    box-shadow: 0 0 16px rgba(255, 217, 120, 0.5);
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .run-btn,
+  .load-btn {
+    height: 42px;
+    border-radius: 8px;
+    font-family: var(--display);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1px solid #6a4c34;
+    background: linear-gradient(180deg, #5b3a22, #3b2517);
+    color: #ffe0c0;
+    transition: 0.16s ease;
+  }
+  .run-btn:hover,
+  .load-btn:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    box-shadow: 0 0 16px rgba(255, 154, 74, 0.36);
+  }
+
+  .case-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+  }
+  select {
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid #6a4b31;
+    background: #2a1d13;
+    color: #ffe2c3;
+    padding: 0 10px;
+    font-family: var(--mono);
+  }
+
+  .grid-two {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .expr-panel,
+  .datapath-panel,
+  .trace-panel,
+  .reg-panel,
+  .truth-panel {
+    padding: 16px;
+  }
+
+  .expr-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    align-items: center;
+  }
+  .expr-big {
+    font-family: var(--display);
+    font-size: clamp(28px, 4vw, 43px);
+    color: #f4f9ff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+  }
+  .expr-big .op { color: var(--cyan); }
+  .expr-big .not { color: var(--pink); }
+  .substituted {
+    font-size: 30px;
+    font-family: var(--display);
+    color: #f0f7ff;
+    text-align: right;
+  }
+  .substituted .result { color: var(--green); text-shadow: 0 0 10px rgba(162, 255, 138, 0.55); }
+
+  .gate {
+    width: 100%;
+    min-height: 120px;
+    border: 1px solid #2a4560;
+    border-radius: 10px;
+    background: rgba(5, 12, 20, 0.52);
+  }
+
+  .datapath-retro {
+    width: 100%;
+    border: 1px solid #61432b;
+    border-radius: 10px;
+    background: radial-gradient(circle at 30% 25%, rgba(57, 115, 86, 0.25), rgba(7, 20, 16, 0.76) 55%);
+    padding: 8px;
+  }
+  .dp-stage-label {
+    font-family: var(--display);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    fill: #cfe6dd;
+  }
+  .dp-box {
+    fill: rgba(4, 13, 10, 0.78);
+    stroke: #d6eee4;
+    stroke-width: 2;
+    rx: 6;
+  }
+  .dp-box-title {
+    font-family: var(--display);
+    font-size: 11px;
+    fill: #f2fff9;
+    letter-spacing: 0.07em;
+  }
+  .dp-small {
+    font-family: var(--mono);
+    font-size: 10px;
+    fill: #b7d8cd;
+  }
+  .dp-flow-main {
+    stroke: var(--amber);
+    stroke-width: 4;
+    stroke-dasharray: 7 5;
+    fill: none;
+    filter: drop-shadow(0 0 3px rgba(255, 217, 120, 0.5));
+  }
+  .dp-flow-alt {
+    stroke: var(--pink);
+    stroke-width: 4;
+    stroke-dasharray: 7 5;
+    fill: none;
+    filter: drop-shadow(0 0 3px rgba(118, 216, 255, 0.45));
+  }
+  .dp-flow-wb {
+    stroke: var(--green);
+    stroke-width: 4;
+    stroke-dasharray: 7 5;
+    fill: none;
+    filter: drop-shadow(0 0 3px rgba(162, 255, 138, 0.45));
+  }
+  .dp-flow-dim {
+    opacity: 0.35;
+  }
+
+  .trace-list {
+    display: grid;
+    gap: 10px;
+    perspective: 900px;
+  }
+  .trace-card {
+    border: 1px solid #2b4a67;
+    border-radius: 12px;
+    background: linear-gradient(115deg, rgba(13,22,35,0.86), rgba(7,12,20,0.9));
+    transform: rotateY(-4deg) rotateX(2deg);
+    padding: 10px 12px;
+    opacity: 0;
+    transition: 0.28s ease;
+  }
+  .trace-card.visible { opacity: 1; transform: rotateY(-2deg) rotateX(1deg); }
+  .trace-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    font-family: var(--display);
+    font-size: 12px;
+  }
+  .trace-op.and { color: var(--cyan); }
+  .trace-op.andn { color: var(--pink); }
+  .trace-op.or { color: var(--green); }
+  .trace-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    font-size: 12px;
+    color: #a8c4d9;
+  }
+
+  .reg-grid {
+    display: grid;
+    grid-template-columns: 90px repeat(7, 1fr);
+    gap: 6px;
+    align-items: center;
+  }
+  .reg-head {
+    font-family: var(--display);
+    font-size: 11px;
+    color: #95b6cf;
+    text-align: center;
+  }
+  .step-label { font-size: 12px; color: #94b2c7; }
+  .reg-cell {
+    border: 1px solid #2a445f;
+    border-radius: 6px;
+    text-align: center;
+    padding: 7px 4px;
+    font-family: var(--display);
+    font-size: 11px;
+    color: #bdd6ea;
+    background: rgba(8, 15, 24, 0.78);
+  }
+  .reg-cell.changed { border-color: var(--amber); color: var(--amber); }
+  .reg-cell.key { border-color: var(--green); color: var(--green); }
+
+  .truth-wrap {
+    display: grid;
+    grid-template-columns: 1.3fr 0.7fr;
+    gap: 12px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  th, td {
+    border: 1px solid #2a4259;
+    padding: 5px 6px;
+    text-align: center;
+  }
+  th {
+    font-family: var(--display);
+    font-size: 10px;
+    color: #97c1de;
+    letter-spacing: 0.08em;
+  }
+  tr.active-row td { background: rgba(255, 154, 74, 0.17); }
+  td.y1 { color: var(--green); }
+  td.y0 { color: var(--red); }
+
+  .kmap {
+    border: 1px solid #2a4560;
+    border-radius: 10px;
+    padding: 10px;
+    background: rgba(8, 14, 24, 0.72);
+  }
+  .kmap-title {
+    font-family: var(--display);
+    font-size: 10px;
+    color: #97b9d2;
+    letter-spacing: 0.12em;
+    margin-bottom: 8px;
+  }
+  .k-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+  }
+  .k-cell {
+    border: 1px solid #2a4259;
+    border-radius: 4px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--display);
+    font-size: 11px;
+    color: #bed8ec;
+    background: rgba(10, 18, 30, 0.92);
+  }
+  .k-cell.on {
+    color: #05240a;
+    background: linear-gradient(180deg, #8dff8e, #3edc4f);
+    border-color: var(--green);
+  }
+  .k-cell.active {
+    outline: 1px solid var(--cyan);
+    box-shadow: 0 0 10px rgba(255, 154, 74, 0.38);
+  }
+
+  .hidden { display: none; }
+
+  @media (max-width: 900px) {
+    .bit-row { grid-template-columns: repeat(3, 1fr); }
+    .expr-content { grid-template-columns: 1fr; }
+    .grid-two { grid-template-columns: 1fr; }
+    .truth-wrap { grid-template-columns: 1fr; }
+    .actions, .case-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="top-banner">
+    <div class="meta">CSC 4210/6218 · GEORGIA STATE UNIVERSITY · SPRING 2026 . Bollapalli Vishnavi Abhishikta</div>
+    <h1>Single-Cycle<br/>Processor</h1>
+  </header>
+
+  <section class="panel control-panel">
+    <div class="section-label">Input Registers</div>
+    <div class="bit-row">
+      <div class="bit-box">
+        <div class="bit-name">A / t0</div>
+        <div class="bit-val" id="tog-A"><button class="active" onclick="setInput('A',0)">0</button><button onclick="setInput('A',1)">1</button></div>
+      </div>
+      <div class="bit-box">
+        <div class="bit-name">B / t1</div>
+        <div class="bit-val" id="tog-B"><button class="active" onclick="setInput('B',0)">0</button><button onclick="setInput('B',1)">1</button></div>
+      </div>
+      <div class="bit-box">
+        <div class="bit-name">C / t2</div>
+        <div class="bit-val" id="tog-C"><button class="active" onclick="setInput('C',0)">0</button><button onclick="setInput('C',1)">1</button></div>
+      </div>
+      <div class="bit-box">
+        <div class="bit-name">D / t3</div>
+        <div class="bit-val" id="tog-D"><button class="active" onclick="setInput('D',0)">0</button><button onclick="setInput('D',1)">1</button></div>
+      </div>
+      <div class="bit-box">
+        <div class="bit-name">A·B</div>
+        <div id="ab-preview" class="substituted" style="font-size:34px;text-align:center;">0</div>
+      </div>
+      <div class="bit-box">
+        <div class="bit-name">C'·D</div>
+        <div id="cd-preview" class="substituted" style="font-size:34px;text-align:center;">0</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="run-btn" onclick="runProcessor()">Execute Program</button>
+      <button class="load-btn" onclick="runSelectedPythonCase()">Load Python Case</button>
+    </div>
+    <div class="case-row">
+      <select id="python-case-select">
+        <option value="">Run python Mmain.py first</option>
+      </select>
+      <button class="load-btn" onclick="refreshPythonCases()">Refresh Cases</button>
+    </div>
+  </section>
+
+  <section id="expr-box" class="panel expr-panel hidden">
+    <div class="section-label">Boolean Expression</div>
+    <div class="expr-content">
+      <div class="expr-big">Y = A<span class="op">·</span>B + <span class="not">C'</span><span class="op">·</span>D</div>
+      <svg class="gate" viewBox="0 0 320 140" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <filter id="g" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        </defs>
+        <g stroke="var(--muted)" stroke-width="2" fill="none" font-family="Orbitron, sans-serif" font-size="11" color="var(--text)">
+          <line x1="15" y1="32" x2="70" y2="32"/><text x="6" y="35" fill="var(--muted)">A</text>
+          <line x1="15" y1="58" x2="70" y2="58"/><text x="6" y="61" fill="var(--muted)">B</text>
+          <line x1="15" y1="90" x2="70" y2="90"/><text x="6" y="93" fill="var(--muted)">C</text>
+          <line x1="15" y1="116" x2="70" y2="116"/><text x="6" y="119" fill="var(--muted)">D</text>
+          <path d="M70 22 L105 22 Q124 45 105 68 L70 68 Z"/><text x="82" y="49" fill="var(--cyan)">OR</text>
+          <path d="M70 80 L105 80 Q124 103 105 126 L70 126 Z"/><text x="80" y="106" fill="var(--pink)">AND</text>
+          <path d="M126 45 L165 45"/><path d="M126 103 L165 103"/>
+          <path d="M165 66 C190 66 206 72 220 84 C206 96 190 102 165 102 C177 92 177 76 165 66 Z"/>
+          <text x="176" y="88" fill="var(--green)">OR</text>
+          <line x1="220" y1="84" x2="278" y2="84"/>
+          <text x="284" y="87" fill="var(--text)">Y</text>
+        </g>
+      </svg>
+      <div class="substituted" id="expr-sub">Y = 0 + 0<br/><span class="result">Result Y = 0</span></div>
+    </div>
+  </section>
+
+  <section id="datapath-wrap" class="panel datapath-panel hidden">
+    <div class="section-label">Datapath</div>
+    <svg class="datapath-retro" viewBox="0 0 1060 290" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arr-cyan" markerWidth="8" markerHeight="8" refX="6" refY="3.5" orient="auto">
+          <polygon points="0 0, 7 3.5, 0 7" fill="var(--amber)"></polygon>
+        </marker>
+        <marker id="arr-mag" markerWidth="8" markerHeight="8" refX="6" refY="3.5" orient="auto">
+          <polygon points="0 0, 7 3.5, 0 7" fill="var(--pink)"></polygon>
+        </marker>
+        <marker id="arr-green" markerWidth="8" markerHeight="8" refX="6" refY="3.5" orient="auto">
+          <polygon points="0 0, 7 3.5, 0 7" fill="var(--green)"></polygon>
+        </marker>
+      </defs>
+
+      <text x="20" y="24" class="dp-stage-label">FETCH</text>
+      <text x="250" y="24" class="dp-stage-label">DECODE</text>
+      <text x="500" y="24" class="dp-stage-label">REGISTER FILE</text>
+      <text x="760" y="24" class="dp-stage-label">ALU</text>
+      <text x="905" y="24" class="dp-stage-label">WRITE-BACK</text>
+
+      <rect id="dp-fetch" x="20" y="60" width="130" height="108" class="dp-box"></rect>
+      <text x="85" y="89" text-anchor="middle" class="dp-box-title">IMEM</text>
+      <text x="85" y="111" text-anchor="middle" class="dp-small">PC / INSTR</text>
+
+      <rect id="dp-decode" x="250" y="60" width="160" height="108" class="dp-box"></rect>
+      <text x="330" y="89" text-anchor="middle" class="dp-box-title">CONTROL</text>
+      <text x="330" y="111" text-anchor="middle" class="dp-small">ALU_OP / INV_A</text>
+
+      <rect id="dp-reg" x="500" y="46" width="200" height="136" class="dp-box"></rect>
+      <text x="600" y="78" text-anchor="middle" class="dp-box-title">Register File</text>
+      <text x="600" y="101" text-anchor="middle" class="dp-small">rs, rt, rd</text>
+      <text id="dp-reg-snap" x="600" y="123" text-anchor="middle" class="dp-small">t0=0 t4=0 t6=0</text>
+
+      <polygon id="dp-alu" points="742,62 838,114 742,166" class="dp-box"></polygon>
+      <text id="dp-alu-op" x="785" y="116" text-anchor="middle" class="dp-box-title">ALU</text>
+
+      <rect id="dp-wb" x="900" y="80" width="140" height="70" class="dp-box"></rect>
+      <text x="970" y="106" text-anchor="middle" class="dp-box-title">WB</text>
+      <text id="dp-wb-snap" x="970" y="126" text-anchor="middle" class="dp-small">t0 ← 0</text>
+
+      <path id="flow-fetch-decode" d="M151 110 L246 110" class="dp-flow-main dp-flow-dim" marker-end="url(#arr-cyan)"></path>
+      <path id="flow-decode-reg" d="M412 110 L495 110" class="dp-flow-main dp-flow-dim" marker-end="url(#arr-cyan)"></path>
+      <path id="flow-reg-alu-main" d="M702 102 L737 102" class="dp-flow-main dp-flow-dim" marker-end="url(#arr-cyan)"></path>
+      <path id="flow-reg-alu-alt" d="M702 122 L737 122" class="dp-flow-alt dp-flow-dim" marker-end="url(#arr-mag)"></path>
+      <path id="flow-alu-wb" d="M840 114 L895 114" class="dp-flow-wb dp-flow-dim" marker-end="url(#arr-green)"></path>
+      <path id="flow-wb-reg" d="M970 151 L970 232 L600 232 L600 187" class="dp-flow-wb dp-flow-dim" marker-end="url(#arr-green)"></path>
+    </svg>
+  </section>
+
+  <section id="trace-wrap" class="panel trace-panel hidden" style="margin-top:14px;">
+    <div class="section-label">Instruction Execution Trace</div>
+    <div id="trace-cards" class="trace-list"></div>
+  </section>
+
+  <section id="reg-wrap" class="panel reg-panel hidden" style="margin-top:14px;">
+    <div class="section-label">Register State Timeline</div>
+    <div class="reg-grid" id="reg-grid"></div>
+  </section>
+
+  <section class="panel truth-panel" style="margin-top:14px;">
+    <div class="section-label">Truth Table</div>
+    <div class="truth-wrap">
+      <table>
+        <thead>
+          <tr><th>A</th><th>B</th><th>C</th><th>D</th><th>A·B</th><th>C'·D</th><th>Y</th></tr>
+        </thead>
+        <tbody id="truth-tbody"></tbody>
+      </table>
+      <div class="kmap">
+        <div class="kmap-title">K-map view (AB rows, CD cols)</div>
+        <div id="kmap-grid" class="k-grid"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script src="task4_results.js"></script>
+<script>
+const inputs = { A: 0, B: 0, C: 0, D: 0 };
+
+function setInput(name, val) {
+  inputs[name] = val;
+  const tog = document.getElementById('tog-' + name);
+  tog.querySelectorAll('button').forEach((b, i) => b.classList.toggle('active', i === val));
+  updatePreview();
+}
+
+function updatePreview() {
+  const A = inputs.A, B = inputs.B, C = inputs.C, D = inputs.D;
+  document.getElementById('ab-preview').textContent = A & B;
+  document.getElementById('cd-preview').textContent = ((~C) & 1) & D;
+}
+
+function hex32(v) { return '0x' + (v >>> 0).toString(16).padStart(8, '0').toUpperCase(); }
+
+const FUNCT_AND = 0b000100;
+const FUNCT_AND_NOT = 0b100100;
+const FUNCT_OR = 0b000101;
+
+function encodeRtype(rs, rt, rd, funct) {
+  return ((rs & 0x1F) << 21) | ((rt & 0x1F) << 16) | ((rd & 0x1F) << 11) | (funct & 0x3F);
+}
+
+function simulate(A, B, C, D) {
+  const regs = [A, B, C, D, 0, 0, 0, 0];
+  const prog = [
+    { instr: encodeRtype(0,1,4,FUNCT_AND), rs:0, rt:1, rd:4, op:'AND', invertA:false, mnemonic:'AND t4, t0, t1' },
+    { instr: encodeRtype(2,3,6,FUNCT_AND_NOT), rs:2, rt:3, rd:6, op:'AND-NOT', invertA:true, mnemonic:'ANDN t6, t2, t3' },
+    { instr: encodeRtype(4,6,0,FUNCT_OR), rs:4, rt:6, rd:0, op:'OR', invertA:false, mnemonic:'OR t0, t4, t6' }
+  ];
+
+  const steps = [];
+  const regSnaps = [regs.slice()];
+  prog.forEach((ins, pc) => {
+    const aRaw = regs[ins.rs];
+    const bVal = regs[ins.rt];
+    const aEff = ins.invertA ? (~aRaw & 0xFFFFFFFF) : aRaw;
+    const result = ins.op === 'OR' ? (aEff | bVal) : (aEff & bVal);
+    regs[ins.rd] = result;
+    regSnaps.push(regs.slice());
+    steps.push({ pc, ...ins, a_raw: aRaw, b_val: bVal, a_eff: aEff, result, regsAfter: regs.slice() });
+  });
+
+  return { A, B, C, D, Y: regs[0], steps, regSnaps };
+}
+
+function buildFromPythonCase(caseData) {
+  const A = caseData.inputs.A;
+  const B = caseData.inputs.B;
+  const C = caseData.inputs.C;
+  const D = caseData.inputs.D;
+  const regs = [A, B, C, D, 0, 0, 0, 0];
+  const regSnaps = [regs.slice()];
+
+  const steps = caseData.trace.map(step => {
+    const sig = step.signals;
+    const dbg = step.alu_debug;
+    const op = dbg.alu_op.includes('OR') ? 'OR' : (sig.invert_a ? 'AND-NOT' : 'AND');
+    const instr = parseInt(String(step.instr_hex).replace(/^0x/i, ''), 16);
+    regs[sig.rd] = step.result;
+    regSnaps.push(regs.slice());
+
+    return {
+      pc: step.pc,
+      instr,
+      rs: sig.rs,
+      rt: sig.rt,
+      rd: sig.rd,
+      op,
+      invertA: sig.invert_a,
+      mnemonic: op === 'AND-NOT' ? `ANDN t${sig.rd}, t${sig.rs}, t${sig.rt}` : `${op} t${sig.rd}, t${sig.rs}, t${sig.rt}`,
+      a_raw: dbg.input_a_raw,
+      b_val: dbg.input_b,
+      a_eff: dbg.input_a_effective,
+      result: step.result,
+      regsAfter: regs.slice()
+    };
+  });
+
+  return { A, B, C, D, Y: caseData.output, steps, regSnaps };
+}
+
+function renderExpr(A, B, C, D, Y) {
+  const ab = A & B;
+  const cd = ((~C) & 1) & D;
+  document.getElementById('expr-sub').innerHTML = `Y = ${A}·${B} + ${C}'·${D}<br/>Y = ${ab} + ${cd}<br/><span class="result">Result Y = ${Y}</span>`;
+}
+
+function renderDatapath(steps) {
+  const final = steps[steps.length - 1];
+  const flows = [
+    'flow-fetch-decode',
+    'flow-decode-reg',
+    'flow-reg-alu-main',
+    'flow-reg-alu-alt',
+    'flow-alu-wb',
+    'flow-wb-reg'
+  ];
+  flows.forEach(id => document.getElementById(id).classList.add('dp-flow-dim'));
+
+  ['dp-fetch', 'dp-decode', 'dp-reg', 'dp-alu', 'dp-wb'].forEach(id => {
+    const el = document.getElementById(id);
+    el.style.filter = 'none';
+  });
+
+  document.getElementById('dp-reg-snap').textContent = `t0=${final.regsAfter[0]}  t4=${final.regsAfter[4]}  t6=${final.regsAfter[6]}`;
+  document.getElementById('dp-alu-op').textContent = final.op;
+  document.getElementById('dp-wb-snap').textContent = `t${final.rd} ← ${final.result}`;
+
+  document.getElementById('dp-fetch').style.filter = 'drop-shadow(0 0 8px rgba(255, 154, 74, 0.45))';
+  document.getElementById('dp-decode').style.filter = 'drop-shadow(0 0 8px rgba(255, 154, 74, 0.45))';
+  document.getElementById('dp-reg').style.filter = 'drop-shadow(0 0 8px rgba(255, 154, 74, 0.45))';
+  document.getElementById('dp-alu').style.filter = 'drop-shadow(0 0 8px rgba(255, 217, 120, 0.45))';
+  document.getElementById('dp-wb').style.filter = 'drop-shadow(0 0 8px rgba(162, 255, 138, 0.45))';
+
+  document.getElementById('flow-fetch-decode').classList.remove('dp-flow-dim');
+  document.getElementById('flow-decode-reg').classList.remove('dp-flow-dim');
+  document.getElementById('flow-reg-alu-main').classList.remove('dp-flow-dim');
+  document.getElementById('flow-reg-alu-alt').classList.remove('dp-flow-dim');
+  document.getElementById('flow-alu-wb').classList.remove('dp-flow-dim');
+  document.getElementById('flow-wb-reg').classList.remove('dp-flow-dim');
+}
+
+function renderTrace(steps) {
+  const wrap = document.getElementById('trace-cards');
+  wrap.innerHTML = '';
+  steps.forEach((s, i) => {
+    const cls = s.op === 'OR' ? 'or' : (s.op === 'AND-NOT' ? 'andn' : 'and');
+    const card = document.createElement('div');
+    card.className = 'trace-card';
+    card.innerHTML = `
+      <div class="trace-head">
+        <div>PC=${s.pc} · ${s.mnemonic}</div>
+        <div class="trace-op ${cls}">${hex32(s.instr)}</div>
+      </div>
+      <div class="trace-grid">
+        <div>Control: ALU=${s.op}, INV_A=${s.invertA ? 1 : 0}, RegWrite=1</div>
+        <div>ALU In: A=${s.a_raw}, A_eff=${s.a_eff}, B=${s.b_val}</div>
+        <div>Writeback: t${s.rd} ← ${s.result}</div>
+        <div>Result: ${s.result}</div>
+      </div>`;
+    wrap.appendChild(card);
+    setTimeout(() => card.classList.add('visible'), 80 + i * 140);
+  });
+}
+
+function renderRegisters(snaps) {
+  const grid = document.getElementById('reg-grid');
+  grid.innerHTML = '';
+
+  const labels = ['', 't0','t1','t2','t3','t4','t5','t6'];
+  labels.forEach(l => {
+    const d = document.createElement('div');
+    d.className = l ? 'reg-head' : '';
+    d.textContent = l;
+    grid.appendChild(d);
+  });
+
+  const rowNames = ['Initial', 'After AND', 'After ANDN', 'Final'];
+  snaps.forEach((row, ri) => {
+    const name = document.createElement('div');
+    name.className = 'step-label';
+    name.textContent = rowNames[ri] || `Step ${ri}`;
+    grid.appendChild(name);
+
+    for (let r = 0; r <= 6; r++) {
+      const c = document.createElement('div');
+      c.className = 'reg-cell';
+      c.textContent = row[r];
+      if (ri > 0 && row[r] !== snaps[ri - 1][r]) c.classList.add('changed');
+      if (ri === snaps.length - 1 && r === 0) c.classList.add('key');
+      grid.appendChild(c);
+    }
+  });
+}
+
+function yExpr(A, B, C, D) {
+  return (A & B) | (((~C) & 1) & D);
+}
+
+function renderTruthTable(selA, selB, selC, selD) {
+  const tb = document.getElementById('truth-tbody');
+  tb.innerHTML = '';
+
+  for (let A = 0; A <= 1; A++)
+  for (let B = 0; B <= 1; B++)
+  for (let C = 0; C <= 1; C++)
+  for (let D = 0; D <= 1; D++) {
+    const ab = A & B;
+    const cd = ((~C) & 1) & D;
+    const y = yExpr(A, B, C, D);
+    const tr = document.createElement('tr');
+    if (A===selA && B===selB && C===selC && D===selD) tr.className = 'active-row';
+    tr.innerHTML = `<td>${A}</td><td>${B}</td><td>${C}</td><td>${D}</td><td>${ab}</td><td>${cd}</td><td class="${y ? 'y1':'y0'}">${y}</td>`;
+    tb.appendChild(tr);
+  }
+}
+
+function gray(i) { return i ^ (i >> 1); }
+
+function renderKmap(selA, selB, selC, selD) {
+  const grid = document.getElementById('kmap-grid');
+  grid.innerHTML = '';
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 4; c++) {
+      const ab = gray(r);
+      const cd = gray(c);
+      const A = (ab >> 1) & 1;
+      const B = ab & 1;
+      const C = (cd >> 1) & 1;
+      const D = cd & 1;
+      const y = yExpr(A, B, C, D);
+      const el = document.createElement('div');
+      el.className = 'k-cell ' + (y ? 'on' : '');
+      if (A===selA && B===selB && C===selC && D===selD) el.classList.add('active');
+      el.textContent = `${y}`;
+      grid.appendChild(el);
+    }
+  }
+}
+
+function renderRun(run) {
+  const { A, B, C, D, Y, steps, regSnaps } = run;
+  setInput('A', A); setInput('B', B); setInput('C', C); setInput('D', D);
+  renderExpr(A, B, C, D, Y);
+  renderDatapath(steps);
+  renderTrace(steps);
+  renderRegisters(regSnaps);
+  renderTruthTable(A, B, C, D);
+  renderKmap(A, B, C, D);
+  ['expr-box','datapath-wrap','trace-wrap','reg-wrap'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+}
+
+function runProcessor() {
+  renderRun(simulate(inputs.A, inputs.B, inputs.C, inputs.D));
+}
+
+function refreshPythonCases() {
+  const sel = document.getElementById('python-case-select');
+  const data = (window.MMAIN_RESULTS && Array.isArray(window.MMAIN_RESULTS.cases)) ? window.MMAIN_RESULTS.cases : [];
+  sel.innerHTML = '';
+  if (!data.length) {
+    const op = document.createElement('option');
+    op.value = '';
+    op.textContent = 'Run python Mmain.py first';
+    sel.appendChild(op);
+    return;
+  }
+  data.forEach((c, i) => {
+    const op = document.createElement('option');
+    op.value = String(i);
+    op.textContent = `Case ${i + 1}: ${c.label}`;
+    sel.appendChild(op);
+  });
+}
+
+function runSelectedPythonCase() {
+  const data = (window.MMAIN_RESULTS && Array.isArray(window.MMAIN_RESULTS.cases)) ? window.MMAIN_RESULTS.cases : [];
+  if (!data.length) {
+    alert('No Python cases loaded. Run: python Mmain.py');
+    return;
+  }
+  const sel = document.getElementById('python-case-select');
+  const idx = Math.max(0, Math.min(data.length - 1, parseInt(sel.value || '0', 10)));
+  renderRun(buildFromPythonCase(data[idx]));
+}
+
+refreshPythonCases();
+updatePreview();
+renderTruthTable(-1,-1,-1,-1);
+renderKmap(-1,-1,-1,-1);
+</script>
+</body>
+</html>

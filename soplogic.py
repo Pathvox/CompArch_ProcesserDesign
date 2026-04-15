@@ -38,10 +38,10 @@ def canonical_sop(rows: Sequence[Dict[str, Tuple[int, ...] | int]]) -> Dict[str,
     terms: List[str] = []
 
     for i, row in enumerate(rows):
-        out = int(row["output"])  # type: ignore[arg-type]
+        out = int(row["output"]) 
         if out == 1:
             minterms.append(i)
-            bits = row["inputs"]  # type: ignore[assignment]
+            bits = row["inputs"]  
             term = "".join(var if bit == 1 else f"{var}'" for bit, var in zip(bits, vars_))
             terms.append(term)
 

@@ -1,7 +1,5 @@
 """
 Memory Hierarchy Simulation (SSD → DRAM → Cache)
-CSC 4210/6210 Computer Architecture - Task 3
-Georgia State University, Spring 2026
 """
 
 import random
